@@ -1,0 +1,12 @@
+version: '3'
+services:
+  db:
+    image: mariadb:10.8
+    restart: always
+    ports:
+      - 33066:3306
+    volumes:
+      - ./docker_data/mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: Root@Nexus
+      MYSQL_DATABASE: nexus

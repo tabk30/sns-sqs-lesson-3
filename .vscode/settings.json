@@ -1,0 +1,20 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true,
+    "source.organizeImports": false
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "eslint.validate": ["javascript", "typescript"],
+  "files.eol": "\n",
+  "javascript.preferences.importModuleSpecifier": "shortest",
+  "javascript.validate.enable": false,
+  "typescript.preferences.importModuleSpecifier": "shortest",
+  "typescript.validate.enable": true,
+  "typescript.referencesCodeLens.enabled": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+  "cSpell.words": ["Screenshotalbe"]
+}
