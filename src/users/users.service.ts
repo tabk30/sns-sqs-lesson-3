@@ -41,6 +41,10 @@ export class UsersService {
       new PublishCommand({
         Message: UserMessageType.USER_REGIST,
         MessageAttributes: {
+          userId: {
+            DataType: 'String',
+            StringValue: `${user.id}`,
+          },
           userName: {
             DataType: 'String',
             StringValue: user.displayName,

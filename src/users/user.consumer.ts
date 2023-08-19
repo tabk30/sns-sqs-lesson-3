@@ -7,6 +7,8 @@ import {
   UserMessageType,
 } from './entities/user-message.entity'
 import { fromIni } from '@aws-sdk/credential-providers'
+import { ConfigService } from '@nestjs/config'
+import Pusher from 'pusher'
 
 const mesAttToObj = (MessageAttributes: Record<string, any>) => {
   const result: Record<string, any> = {}
@@ -26,7 +28,22 @@ const mesAttToObj = (MessageAttributes: Record<string, any>) => {
 @Injectable()
 export class UserConsumer {
   private sqsClient: SQSClient
-  constructor(private readonly mailerService: MailerService) {
+  private pusher: Pusher
+  private channel: string
+  private eventPrefix: string
+  constructor(
+    private readonly mailerService: MailerService,
+    private readonly configService: ConfigService,
+  ) {
+    this.pusher = new Pusher({
+      appId: this.configService.get<string>('PUSHER_APP_ID'),
+      key: this.configService.get<string>('PUSHER_APP_KEY'),
+      secret: this.configService.get<string>('PUSHER_SECRET'),
+      cluster: this.configService.get<string>('PUSHER_CLUSTER'),
+      useTLS: true,
+    })
+    this.channel = this.configService.get<string>('PUSHER_CHANEL')
+    this.eventPrefix = this.configService.get<string>('PUSHER_EVENT_PREFIX')
     this.sqsClient = new SQSClient({
       credentials: fromIni({
         profile: 'default',
@@ -77,6 +94,7 @@ export class UserConsumer {
     try {
       if (payload.message == UserMessageType.USER_REGIST)
         await this.notifyUserRegist({
+          id: Number(payload.body.userId),
           email: payload.body.userEmail,
           name: payload.body.userName,
         })
@@ -92,8 +110,17 @@ export class UserConsumer {
     }
   }
 
-  async notifyUserRegist({ email, name }: { email: string; name: string }) {
-    const res = await this.mailerService.sendMail({
+  async notifyUserRegist({
+    id,
+    email,
+    name,
+  }: {
+    id: number
+    email: string
+    name: string
+  }) {
+    // Send email
+    await this.mailerService.sendMail({
       transporterName: 'ses',
       to: email,
       subject: 'Welcome to Lesson3',
@@ -102,6 +129,22 @@ export class UserConsumer {
         webURL: 'https://pionero.io',
       },
     })
-    console.log('notifyUserRegist', res)
+
+    await this.mailerService.sendMail({
+      transporterName: 'ses',
+      to: this.configService.get<string>('MAILER_ADMIN'),
+      subject: 'New User regist to Lesson3',
+      template: 'user-invited',
+      context: {
+        webURL: 'https://pionero.io',
+      },
+    })
+
+    const event = `${this.eventPrefix}_${id}`
+    this.pusher.trigger(this.channel, event, {
+      message: UserMessageType.USER_REGIST,
+      email: email,
+      name: name,
+    })
   }
 }
