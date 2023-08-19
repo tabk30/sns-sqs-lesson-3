@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
-import { ConfigModule } from '@nestjs/config'
+import { ConfigModule, ConfigService } from '@nestjs/config'
 import { PrismaModule } from './db'
 import { prismaLoggingMiddleware } from './db/prisma.logging.middleware'
-import { UsersModule } from './users/users.module';
+import { UsersModule } from './users/users.module'
+import { MailerModule } from '@nestjs-modules/mailer'
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter'
+import path from 'path'
 
 @Module({
   imports: [
@@ -27,6 +30,40 @@ import { UsersModule } from './users/users.module';
         },
         explicitConnect: true,
       },
+    }),
+    MailerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        transports: {
+          ses: {
+            host: 'arn:aws:ses:ap-southeast-1:377116985439:identity/tabk301991@gmail.com',
+            port: 587,
+            auth: {
+              user: 'AKIAVPTPMRBPXPUBOTF5',
+              pass: 'BD3ZiN6lHREhjghNw5mUBcamyO8gLAYVCKkMEzocZYDn',
+            },
+          },
+          // resend: {
+          //   host: 'smtp.resend.com',
+          //   port: 587,
+          //   auth: {
+          //     user: 'resend',
+          //     pass: configService.get<string>('RESEND_KEY'),
+          //   },
+          // },
+        },
+        defaults: {
+          from: configService.get<string>('MAILER_DEFAULT_FROM'),
+        },
+        template: {
+          dir: path.join(process.cwd(), 'templates'),
+          adapter: new HandlebarsAdapter(),
+          options: {
+            strict: true,
+          },
+        },
+      }),
+      inject: [ConfigService],
     }),
     UsersModule,
   ],

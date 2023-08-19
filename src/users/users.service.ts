@@ -6,6 +6,7 @@ import { UserStatus } from '@prisma/client'
 import { UserEntity } from './entities/user.entity'
 import { PublishCommand, SNS, SNSClient } from '@aws-sdk/client-sns'
 import { fromIni } from '@aws-sdk/credential-providers'
+import { UserMessageType } from './entities/user-message.entity'
 
 @Injectable()
 export class UsersService {
@@ -29,18 +30,33 @@ export class UsersService {
         status: UserStatus.INVITED,
       },
     })
+    console.log(
+      'send message',
+      JSON.stringify({
+        type: UserMessageType.USER_REGIST,
+        body: user,
+      }),
+    )
     const res = await this._sns.send(
       new PublishCommand({
-        Message: JSON.stringify({
-          type: 'regist_user',
-          body: JSON.stringify(user),
-        }),
+        Message: UserMessageType.USER_REGIST,
+        MessageAttributes: {
+          userName: {
+            DataType: 'String',
+            StringValue: user.displayName,
+          },
+          userEmail: {
+            DataType: 'String',
+            StringValue: user.email,
+          },
+        },
         TopicArn: 'arn:aws:sns:ap-southeast-1:377116985439:Lesson-3',
+        // MessageDeduplicationId: `${user.id}`,
         // MessageStructure: 'json',
       }),
     )
 
-    console.log('send to sqs', res)
+    console.log('send to SNS', res)
 
     return new UserEntity(user)
   }
