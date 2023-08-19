@@ -8,6 +8,21 @@ import {
 } from './entities/user-message.entity'
 import { fromIni } from '@aws-sdk/credential-providers'
 
+const mesAttToObj = (MessageAttributes: Record<string, any>) => {
+  const result: Record<string, any> = {}
+  for (const key in MessageAttributes) {
+    const value = MessageAttributes[key]
+    if (value && value.Type) {
+      if (value.Type == 'String') {
+        result[key] = value.Value
+      } else if (value.Type == 'Number') {
+        result[key] = Number(value.Value)
+      }
+    }
+  }
+  return result
+}
+
 @Injectable()
 export class UserConsumer {
   private sqsClient: SQSClient
@@ -48,19 +63,22 @@ export class UserConsumer {
   }
 
   async onSqsMessage(message: Message) {
-    console.log('onSqsMessage', message)
     const body = JSON.parse(message.Body)
     const { Message, MessageAttributes } = body
-    console.log('onSqsMessage body payload', Message, MessageAttributes)
+    console.log(
+      'onSqsMessage body payload',
+      MessageAttributes,
+      mesAttToObj(MessageAttributes),
+    )
     const payload: UserMessageEntity = new UserMessageEntity({
       message: Message,
-      body: body,
+      body: mesAttToObj(MessageAttributes),
     })
     try {
       if (payload.message == UserMessageType.USER_REGIST)
         await this.notifyUserRegist({
-          email: payload.body.email,
-          name: payload.body.name,
+          email: payload.body.userEmail,
+          name: payload.body.userName,
         })
       await this.sqsClient.send(
         new DeleteMessageCommand({
