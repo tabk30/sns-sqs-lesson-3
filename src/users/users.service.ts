@@ -1,23 +1,47 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { PrismaService } from 'src/db'
 import { UserStatus } from '@prisma/client'
 import { UserEntity } from './entities/user.entity'
+import { PublishCommand, SNS, SNSClient } from '@aws-sdk/client-sns'
+import { fromIni } from '@aws-sdk/credential-providers'
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private _sns: SNSClient
+  constructor(private readonly prisma: PrismaService) {
+    this._sns = new SNSClient({
+      credentials: fromIni({ profile: 'default' }),
+    })
+  }
   async create(createUserDto: CreateUserDto) {
+    const { email } = createUserDto
+    const userDB = await this.prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    })
+    if (userDB) throw new BadRequestException(`Email ${email} used!`)
     const user = await this.prisma.user.create({
       data: {
         ...createUserDto,
         status: UserStatus.INVITED,
       },
     })
-    // Send notify to themself
-    // Send notify to admin
-    // push to front-end
+    const res = await this._sns.send(
+      new PublishCommand({
+        Message: JSON.stringify({
+          type: 'regist_user',
+          body: JSON.stringify(user),
+        }),
+        TopicArn: 'arn:aws:sns:ap-southeast-1:377116985439:Lesson-3',
+        // MessageStructure: 'json',
+      }),
+    )
+
+    console.log('send to sqs', res)
+
     return new UserEntity(user)
   }
 
