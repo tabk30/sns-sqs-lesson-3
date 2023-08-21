@@ -66,13 +66,13 @@ export class UsersService {
   }
 
   async login(email: string) {
-    let user = await this.prisma.user.findFirstOrThrow({
+    const user = await this.prisma.user.findFirstOrThrow({
       where: {
         email: email,
       },
     })
     if (user.status === UserStatus.INVITED) {
-      user = await this.prisma.user.update({
+      const upUser = await this.prisma.user.update({
         where: {
           id: user.id,
         },
@@ -82,6 +82,33 @@ export class UsersService {
       })
       // save to back-up DB
       // send notify
+      const res = await this._sns.send(
+        new PublishCommand({
+          Message: UserMessageType.USER_JOIN,
+          MessageAttributes: {
+            id: {
+              DataType: 'String',
+              StringValue: `${upUser.id}`,
+            },
+            displayName: {
+              DataType: 'String',
+              StringValue: upUser.displayName,
+            },
+            email: {
+              DataType: 'String',
+              StringValue: upUser.email,
+            },
+            status: {
+              DataType: 'String',
+              StringValue: upUser.status,
+            },
+          },
+          TopicArn: 'arn:aws:sns:ap-southeast-1:377116985439:Lesson-3',
+        }),
+      )
+
+      console.log('send to SNS', res)
+      return new UserEntity(upUser)
     }
     return new UserEntity(user)
   }

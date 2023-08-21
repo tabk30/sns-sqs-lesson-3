@@ -9,6 +9,8 @@ import {
 import { fromIni } from '@aws-sdk/credential-providers'
 import { ConfigService } from '@nestjs/config'
 import Pusher from 'pusher'
+import { UserStatus } from '@prisma/client'
+import { PrismaService } from 'src/db'
 
 const mesAttToObj = (MessageAttributes: Record<string, any>) => {
   const result: Record<string, any> = {}
@@ -34,6 +36,7 @@ export class UserConsumer {
   constructor(
     private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
+    private readonly prismaService: PrismaService,
   ) {
     this.pusher = new Pusher({
       appId: this.configService.get<string>('PUSHER_APP_ID'),
@@ -80,24 +83,29 @@ export class UserConsumer {
   }
 
   async onSqsMessage(message: Message) {
+    console.log('onSqsMessage sqs message', message)
     const body = JSON.parse(message.Body)
     const { Message, MessageAttributes } = body
-    console.log(
-      'onSqsMessage body payload',
-      MessageAttributes,
-      mesAttToObj(MessageAttributes),
-    )
     const payload: UserMessageEntity = new UserMessageEntity({
       message: Message,
       body: mesAttToObj(MessageAttributes),
     })
+    console.log('onSqsMessage body payload', payload)
     try {
-      if (payload.message == UserMessageType.USER_REGIST)
+      if (payload.message == UserMessageType.USER_REGIST) {
         await this.notifyUserRegist({
           id: Number(payload.body.userId),
           email: payload.body.userEmail,
           name: payload.body.userName,
         })
+      } else if (payload.message == UserMessageType.USER_JOIN) {
+        await this.backupUser({
+          id: Number(payload.body.id),
+          displayName: payload.body.displayName,
+          email: payload.body.email,
+          status: payload.body.status,
+        })
+      }
       await this.sqsClient.send(
         new DeleteMessageCommand({
           QueueUrl:
@@ -145,6 +153,27 @@ export class UserConsumer {
       message: UserMessageType.USER_REGIST,
       email: email,
       name: name,
+    })
+  }
+
+  async backupUser({
+    id,
+    displayName,
+    email,
+    status,
+  }: {
+    id: number
+    displayName: string
+    email: string
+    status: UserStatus
+  }) {
+    await this.prismaService.userBackup.create({
+      data: {
+        userId: id,
+        displayName: displayName,
+        email: email,
+        status: status,
+      },
     })
   }
 }
